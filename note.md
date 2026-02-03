@@ -1,0 +1,2 @@
+- 它是 OpenCode 的插件，而“Claude Code 兼容层”指的是 OpenCode 读取 Claude Code 的配置与目录结构（commands/skills/agents/MCP/hooks 等），不是让 Claude Code 去加载 oh-my-opencode。
+- command可以自定义，hook可以自定义，工具可以自定义

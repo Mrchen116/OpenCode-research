@@ -1,24 +1,29 @@
-# OhMyOpenCode 主 Agent 报告 (Sisyphus)
+# OhMyOpenCode 主 Agent 报告 (Sisyphus, main agent)
 
 一句话定位：默认主编排器，负责理解用户意图、拆解任务、调度子代理并验证输出；面向“从请求到交付”的完整闭环。
 
 ## 1. 身份与系统提示词 (Identity & Prompt)
 
-**身份设定 (核心区别)**
-- 角色：Primary Orchestrator（顶层编排，直接对用户交互）。
-- 性格与标准：SF Bay Area engineer；“Work, delegate, verify, ship. No AI slop.”
-- 关键能力：意图分流、代码库成熟度评估、强制并行、强制验证。
+**Role & Operating Mode**
+Sisyphus 被定义为主编排器（SF Bay Area engineer），核心标准是“Work, delegate, verify, ship”，且只有用户明确要求实现时才会开始实现。Operating Mode 强调“永远不单干”：前端任务优先委托，深度研究必须并行子代理，复杂架构先咨询 Oracle。
 
-**提示词摘要 (你能从中预期什么)**
-- 先分类再行动：Trivial/Explicit/Exploratory/Open-ended/Ambiguous。
-- 先探索后执行：优先用 Explore/Librarian 并行补上下文。
-- 默认委托：能委托就委托，只有超简单才自己做。
-- 强制验证：改动后必须诊断、构建、测试（如适用）。
+**Intent Gate（分类→策略）**
+每条消息必须先分类为 Trivial/Explicit/Exploratory/Open-ended/Ambiguous，再按分类选择策略；若存在 2x 以上工作量差异或关键信息缺失，必须问一个问题。
 
-**系统提示词来源**
-- 动态提示词入口：`oh-my-opencode/src/agents/sisyphus.ts:26`
-- 身份与风格：`oh-my-opencode/src/agents/sisyphus.ts:42`
-- 动态拼装器：`oh-my-opencode/src/agents/dynamic-agent-prompt-builder.ts:65`
+**Codebase Assessment（成熟度→行为）**
+先判断代码库处于 Disciplined/Transitional/Legacy/Greenfield，再决定是严格跟随、询问选择、先提案再确认或采用最佳实践。
+
+**Exploration & Research**
+Explore/Librarian 被定义为“并行 grep”，必须后台并行，禁止阻塞；搜索达到“足够用”就停止，并按“启动任务→继续工作→需要时读取→结束前 cancel”的流程收集结果。
+
+**Implementation & Failure Recovery**
+多步骤任务先建 Todo，并严格更新 in_progress/completed；变更完成后必须诊断、构建、测试（如适用）。连续失败必须停止并咨询 Oracle。
+
+**Completion**
+所有 Todo 完成、诊断干净、构建/测试通过才可结束。
+
+来源定位：`oh-my-opencode/src/agents/sisyphus.ts:42`, `oh-my-opencode/src/agents/sisyphus.ts:62`, `oh-my-opencode/src/agents/sisyphus.ts:116`, `oh-my-opencode/src/agents/sisyphus.ts:141`, `oh-my-opencode/src/agents/sisyphus.ts:186`, `oh-my-opencode/src/agents/sisyphus.ts:276`
+系统提示词来源：`oh-my-opencode/src/agents/sisyphus.ts:26`, `oh-my-opencode/src/agents/dynamic-agent-prompt-builder.ts:65`
 
 ## 2. 工具系统 (可调用工具)
 
@@ -26,6 +31,14 @@
 - 允许：`delegate_task`, `question`, `task_*`, `teammate`
 - 禁止：`call_omo_agent`
 - 来源：`oh-my-opencode/src/plugin-handlers/config-handler.ts:425`
+
+**权限合并与裁决规则 (重要，决定“能不能用”)**
+- 权限不是“文档列了就能用”，而是由多层规则合并后裁决。
+- 规则来源：Agent 自身权限 + 会话权限（用户/项目配置）+ 用户工具禁用项。
+- 运行时会按合并结果剔除工具（被 deny 的工具不会出现在可用工具列表里）。
+- 未命中任何规则时默认是 `ask`（调用时弹权限请求）。
+- `edit` 权限覆盖 `edit/write/patch/multiedit`。
+- 来源：`opencode/packages/opencode/src/permission/next.ts:63`, `opencode/packages/opencode/src/permission/next.ts:231`, `opencode/packages/opencode/src/session/llm.ts:268`
 
 **工具清单与用途 (全部列出即全部解释)**
 

@@ -4,25 +4,26 @@
 
 ## 1. 身份与系统提示词 (Identity & Prompt)
 
-**身份设定 (核心区别)**
-- 角色：Strategic Planning Consultant（规划顾问）。
-- 核心约束：永远只做规划，不实现代码。
-- 用户说“做/修/实现”：统一解释为“生成工作计划”。
+**Critical Identity & Request Interpretation**
+开头 CRITICAL IDENTITY 强制定义 Prometheus 是规划者，不是实现者，绝不写代码或执行任务；REQUEST INTERPRETATION 明确用户说“做/修/实现”全部解释为“生成计划”。
 
-**提示词摘要 (你能从中预期什么)**
-- 先访谈再规划：先问清需求，再生成计划。
-- 规划前会调用 Metis 做缺口扫描。
-- 可选高精度模式：交给 Momus 反复审查计划。
-- 只能写 `.md`，且输出路径固定为 `.sisyphus/plans/*.md`。
+**Identity Constraints / Forbidden / Outputs**
+随后给出 Identity Constraints 表，明确“你是什么/你不是什么”，并列出 FORBIDDEN ACTIONS（写代码、改源码、运行实现命令、写非 .md）和 ONLY OUTPUTS（澄清问题、研究结果、计划文件、草稿文件）。当用户要求直接实现时，提示词要求拒绝并解释规划价值。
 
-**系统提示词来源**
-- 系统提示词拼装：`oh-my-opencode/src/agents/prometheus/index.ts:30`
-- 身份与约束：`oh-my-opencode/src/agents/prometheus/identity-constraints.ts:8`
-- 访谈模式：`oh-my-opencode/src/agents/prometheus/interview-mode.ts:8`
-- 计划生成：`oh-my-opencode/src/agents/prometheus/plan-generation.ts:8`
-- 高精度审核：`oh-my-opencode/src/agents/prometheus/high-accuracy-mode.ts:7`
-- 计划模板：`oh-my-opencode/src/agents/prometheus/plan-template.ts:8`
-- 行为总结：`oh-my-opencode/src/agents/prometheus/behavioral-summary.ts:7`
+**Absolute Constraints（Interview → Plan）**
+进入 ABSOLUTE CONSTRAINTS：默认 Interview Mode 先访谈澄清；每次对话后做 Clearance Checklist（目标清晰、范围明确、无关键歧义、技术路径已定、测试策略已定、无阻塞问题）以决定是否自动进入计划生成。
+
+**Markdown‑only / Plan Output / Single Plan**
+强制 Markdown‑only，并限定计划输出路径为 `.sisyphus/plans/*.md`；SINGLE PLAN MANDATE 要求无论任务多大都只能生成一份计划，禁止拆分多计划。
+
+**Draft as Memory**
+访谈期持续写 `.sisyphus/drafts/*.md`，并给出草稿结构，用作长期记忆与事实记录。
+
+**Turn Termination Rules**
+每轮必须以提问/等待/转计划结束，不允许无收束的结尾。
+
+来源定位：`oh-my-opencode/src/agents/prometheus/identity-constraints.ts:11`, `oh-my-opencode/src/agents/prometheus/identity-constraints.ts:42`, `oh-my-opencode/src/agents/prometheus/identity-constraints.ts:80`, `oh-my-opencode/src/agents/prometheus/identity-constraints.ts:109`, `oh-my-opencode/src/agents/prometheus/identity-constraints.ts:117`, `oh-my-opencode/src/agents/prometheus/identity-constraints.ts:140`, `oh-my-opencode/src/agents/prometheus/identity-constraints.ts:190`
+系统提示词来源：`oh-my-opencode/src/agents/prometheus/index.ts:30`
 
 ## 2. 工具系统 (可调用工具)
 
@@ -31,6 +32,14 @@
 - 写入被 `prometheus-md-only` 钩子限制为 `.md`
 - 运行时权限补充：允许 `delegate_task`, `question`, `task_*`, `teammate`，禁止 `call_omo_agent`
 - 来源：`oh-my-opencode/src/agents/prometheus/index.ts:42`, `oh-my-opencode/src/plugin-handlers/config-handler.ts:433`
+
+**权限合并与裁决规则 (重要，决定“能不能用”)**
+- 权限不是“文档列了就能用”，而是由多层规则合并后裁决。
+- 规则来源：Agent 自身权限 + 会话权限（用户/项目配置）+ 用户工具禁用项。
+- 运行时会按合并结果剔除工具（被 deny 的工具不会出现在可用工具列表里）。
+- 未命中任何规则时默认是 `ask`（调用时弹权限请求）。
+- `edit` 权限覆盖 `edit/write/patch/multiedit`。
+- 来源：`opencode/packages/opencode/src/permission/next.ts:63`, `opencode/packages/opencode/src/permission/next.ts:231`, `opencode/packages/opencode/src/session/llm.ts:268`
 
 **工具清单与用途 (全部列出即全部解释)**
 

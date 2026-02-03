@@ -4,20 +4,26 @@
 
 ## 1. 身份与系统提示词 (Identity & Prompt)
 
-**身份设定 (核心区别)**
-- 角色：Master Orchestrator（计划执行编排）。
-- 行为：只指挥、不实现；强调“委托 + 验证”。
-- 场景：有明确 Todo/计划时作为执行编排入口。
+**Identity & Mission**
+Identity 段把 Atlas 定义为 Master Orchestrator，强调“指挥不演奏”，只负责编排、协调与验证，绝不自己写代码。Mission 明确目标是“Complete ALL tasks in a work plan”，每次委托只做一个任务，可并行则并行，所有结果必须验证。
 
-**提示词摘要 (你能从中预期什么)**
-- 强制按 Todo 执行，强调并行与依赖管理。
-- 每个任务严格 6 段式委托模板。
-- 每次委托后必须做项目级验证。
+**Delegation System（两种互斥模式）**
+`delegate_task` 只有两种互斥模式：Category 模式（`delegate_task(category=..., load_skills=[...])`）会生成 `Sisyphus-Junior-{category}`，适合领域任务；Agent 模式（`delegate_task(subagent_type=..., load_skills=[...])`）直接调用专精子代理（如 oracle、librarian）。
 
-**系统提示词来源**
-- 系统提示词：`ATLAS_SYSTEM_PROMPT` in `oh-my-opencode/src/agents/atlas.ts:125`
-- 委托规范：`oh-my-opencode/src/agents/atlas.ts:173`
-- 动态拼装入口：`oh-my-opencode/src/agents/atlas.ts:502`
+**6‑Section Prompt Structure（委托提示词模板）**
+委托提示词必须包含六段：
+1) TASK：引用计划里的 checkbox；
+2) EXPECTED OUTCOME：文件清单/行为/验证命令；
+3) REQUIRED TOOLS：需要用的工具及用途；
+4) MUST DO：必须遵循的模式/测试/记事本更新；
+5) MUST NOT DO：禁止范围/禁止改动/禁止跳过验证；
+6) CONTEXT：notepad 路径/继承经验/依赖关系。提示词过短视为失败。
+
+**Workflow（执行编排顺序）**
+先用 TodoWrite 注册“完成全部任务”，再解析计划并构建并行/依赖图，随后初始化 notepad 目录结构，为后续委托提供上下文。
+
+来源定位：`oh-my-opencode/src/agents/atlas.ts:125`, `oh-my-opencode/src/agents/atlas.ts:141`, `oh-my-opencode/src/agents/atlas.ts:173`, `oh-my-opencode/src/agents/atlas.ts:217`, `oh-my-opencode/src/agents/atlas.ts:246`
+系统提示词来源：`oh-my-opencode/src/agents/atlas.ts:125`
 
 ## 2. 工具系统 (可调用工具)
 
@@ -25,6 +31,14 @@
 - 允许：`delegate_task`, `task_*`, `teammate`
 - 禁止：`task`, `call_omo_agent`
 - 来源：`oh-my-opencode/src/plugin-handlers/config-handler.ts:421`
+
+**权限合并与裁决规则 (重要，决定“能不能用”)**
+- 权限不是“文档列了就能用”，而是由多层规则合并后裁决。
+- 规则来源：Agent 自身权限 + 会话权限（用户/项目配置）+ 用户工具禁用项。
+- 运行时会按合并结果剔除工具（被 deny 的工具不会出现在可用工具列表里）。
+- 未命中任何规则时默认是 `ask`（调用时弹权限请求）。
+- `edit` 权限覆盖 `edit/write/patch/multiedit`。
+- 来源：`opencode/packages/opencode/src/permission/next.ts:63`, `opencode/packages/opencode/src/permission/next.ts:231`, `opencode/packages/opencode/src/session/llm.ts:268`
 
 **工具清单与用途 (全部列出即全部解释)**
 
