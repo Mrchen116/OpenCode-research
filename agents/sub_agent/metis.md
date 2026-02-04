@@ -4,14 +4,56 @@
 
 ## 1. 身份与系统提示词 (Identity & Prompt)
 
-**Role & Mission（规划前分析）**
-Metis 被定义为“在规划之前运行”的分析代理：先做意图分类（Refactor/Build/Mid-sized/Collaborative/Architecture/Research），再按类别给出风险、澄清问题、对 Prometheus 的硬约束（MUST/MUST NOT）和可执行验收标准指令。
+Metis 的系统提示词是一个“先分类 → 再按意图给指令 → 输出固定格式”的规划前分析流程。
+这里严格按系统提示词原始顺序梳理（标题顺序与 `oh-my-opencode/src/agents/metis.ts` 保持一致）。
 
-**Guardrails（防 AI Slop）**
-系统提示词内反复强调：先探索再提问、明确 Must Not Have、验收标准必须可由 agent 执行（curl/bun/playwright），禁止依赖用户手工验证。
-
-来源定位：`oh-my-opencode/src/agents/metis.ts:7`, `oh-my-opencode/src/agents/metis.ts:21`, `oh-my-opencode/src/agents/metis.ts:313`
 系统提示词来源：`oh-my-opencode/src/agents/metis.ts:21`
+
+### `# Metis - Pre-Planning Consultant`
+
+### `## CONSTRAINTS`
+
+- READ-ONLY：只分析/提问/建议，不实现、不改文件。
+- OUTPUT：输出喂给 Prometheus（planner），必须可执行、可落地。
+
+### `## PHASE 0: INTENT CLASSIFICATION (MANDATORY FIRST STEP)`
+
+- Step 1：识别意图类型（Refactoring / Build from Scratch / Mid-sized / Collaborative / Architecture / Research）。
+- Step 2：验证分类；如果意图不清晰，必须先 ASK。
+
+### `## PHASE 1: INTENT-SPECIFIC ANALYSIS`
+
+- IF REFACTORING：
+  - Mission：零回归、保行为。
+  - 给 Prometheus 的 tool guidance（lsp_find_references / lsp_rename / ast_grep_*）。
+  - Questions to Ask + Directives（MUST/MUST NOT）。
+- IF BUILD FROM SCRATCH：
+  - Mission：先探索再提问；先发 explore/librarian probes（示例用 `call_omo_agent`）。
+  - Questions + Directives（MUST follow discovered patterns；MUST NOT invent patterns/scope creep）。
+- IF MID-SIZED TASK：
+  - Mission：边界精确；列 AI-slop patterns；强制 Must Have / Must NOT Have。
+- IF COLLABORATIVE：
+  - Mission：对话式澄清；记录 key decisions；重大决策必须用户确认。
+- IF ARCHITECTURE：
+  - Mission：长期影响评估；建议 Prometheus 先咨询 Oracle；强调不要为假想未来过度设计。
+- IF RESEARCH：
+  - Mission：定义出口条件与 time box；并行探针；禁止无限研究。
+
+### `## OUTPUT FORMAT`
+
+- 输出必须符合 markdown 模板：Intent Classification / Pre-Analysis Findings / Questions for User / Identified Risks / Directives for Prometheus（含 QA/Acceptance Criteria Directives）/ Recommended Approach。
+- 核心硬约束：Acceptance criteria 必须可被 agent 直接执行（curl/bun/playwright），禁止“用户手工验证/点击/目测确认”。
+
+### `## TOOL REFERENCE`
+
+- 工具与意图的对照表（lsp_* / ast_grep_* / explore / librarian / oracle）。
+
+### `## CRITICAL RULES`
+
+- NEVER：跳过 intent 分类、问泛泛问题、在歧义未消除时推进、对用户代码库做无根据假设、给需要用户介入的验收标准、留下 placeholder-heavy 的 QA。
+- ALWAYS：先分类、具体化问题、Build/Research 先 explore、给 Prometheus 可执行指令、每次输出包含 QA 自动化指令。
+
+来源定位（阶段标题行）：`oh-my-opencode/src/agents/metis.ts:21`, `oh-my-opencode/src/agents/metis.ts:23`, `oh-my-opencode/src/agents/metis.ts:30`, `oh-my-opencode/src/agents/metis.ts:53`, `oh-my-opencode/src/agents/metis.ts:214`, `oh-my-opencode/src/agents/metis.ts:274`, `oh-my-opencode/src/agents/metis.ts:287`
 
 ## 2. 工具系统 (可调用工具)
 

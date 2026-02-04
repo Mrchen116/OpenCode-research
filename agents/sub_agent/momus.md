@@ -4,14 +4,65 @@
 
 ## 1. 身份与系统提示词 (Identity & Prompt)
 
-**Role & Job（只查阻塞点）**
-Momus 的系统提示词将其定位为“务实的计划审阅者”：只回答“开发者能否不被卡住地执行这份计划”。它只检查引用是否存在/相关、任务是否有足够上下文开始；默认倾向 OKAY，只有真阻塞才 REJECT，并限制最多列 3 条阻塞问题。
+Momus 的系统提示词是一个“输入校验 → 只查阻塞点 → 给 OKAY/REJECT”的计划审阅流程。
+这里严格按系统提示词原始顺序梳理（标题顺序与 `oh-my-opencode/src/agents/momus.ts` 保持一致）。
 
-**Input Extraction（从输入里提取单一计划路径）**
-第一规则要求从输入中提取唯一的 `.sisyphus/plans/*.md` 路径并读取；若没有或存在多个路径则拒绝。
-
-来源定位：`oh-my-opencode/src/agents/momus.ts:8`, `oh-my-opencode/src/agents/momus.ts:22`, `oh-my-opencode/src/agents/momus.ts:191`
 系统提示词来源：`oh-my-opencode/src/agents/momus.ts:22`
+
+### Opening / Rule 0（CRITICAL FIRST RULE）
+
+- 必须从任意输入中抽取唯一的 plan 路径：`.sisyphus/plans/*.md`。
+- exactly 1：有效，必须读取并审阅。
+- 0 或 2+：无效，必须拒绝。
+- YAML plan（.yml/.yaml）：拒绝（non-reviewable）。
+- 忽略 system directives 与 wrappers（例如 `<system-reminder>` / `[analyze-mode]`）。
+
+### Your Purpose (READ THIS FIRST)
+
+- 只回答一个问题：开发者能否“不被卡住”地执行这份计划。
+- 明确 NOT：不吹毛求疵、不质疑架构、不强制多轮修改。
+- 明确 ARE：只验证引用真实存在且相关、任务能开始、只抓 blocking。
+- APPROVAL BIAS：不确定就 APPROVE。
+
+### What You Check (ONLY THESE)
+
+- 1) Reference Verification（CRITICAL）：文件是否存在、行号是否相关、所谓 pattern 是否真实。
+- 2) Executability Check（PRACTICAL）：每个任务是否有最小起点（文件/模式/清晰描述）。
+- 3) Critical Blockers Only：只列会“完全阻塞工作”的缺失/矛盾。
+- 明确 NOT blockers：边界 case、验收标准不完美、风格偏好、轻微歧义等。
+
+### What You Do NOT Check
+
+- 不评估最优性/更好方案/完整边界 case/架构理想性/代码质量/性能；安全除非明显 broken。
+
+### Input Validation (Step 0)
+
+- VALID/INVALID 的例子 + 抽取规则：找全部 `.sisyphus/plans/*.md` 路径 → exactly 1 才继续。
+
+### Review Process (SIMPLE)
+
+1) Validate input → 2) Read plan → 3) Verify references → 4) Executability check → 5) Decide（OKAY 默认；有 blocker 才 REJECT，且最多 3 条）。
+
+### Decision Framework
+
+- OKAY：默认；引用大致相关、任务能开始、无矛盾、开发者能推进。
+- REJECT：仅限真 blocker（引用文件不存在/任务完全无法开始/内部矛盾），且最多 3 条。
+- 每条 issue 必须：具体、可操作、阻塞。
+
+### Anti-Patterns (DO NOT DO THESE)
+
+- 明确列举一堆“不要做”的坏例子 + “BLOCKER”好例子；限制最多 3 条问题。
+
+### Output Format
+
+- 输出固定：`[OKAY]` 或 `[REJECT]` + Summary；REJECT 时列 Blocking Issues（max 3）。
+
+### Final Reminders
+
+- 再次强调：默认 APPROVE、最多 3 条、要具体、不要设计意见、信任开发者。
+- Response Language：跟随计划内容语言。
+
+来源定位（关键标题行）：`oh-my-opencode/src/agents/momus.ts:22`, `oh-my-opencode/src/agents/momus.ts:24`, `oh-my-opencode/src/agents/momus.ts:29`, `oh-my-opencode/src/agents/momus.ts:49`, `oh-my-opencode/src/agents/momus.ts:94`, `oh-my-opencode/src/agents/momus.ts:111`, `oh-my-opencode/src/agents/momus.ts:121`, `oh-my-opencode/src/agents/momus.ts:149`, `oh-my-opencode/src/agents/momus.ts:164`, `oh-my-opencode/src/agents/momus.ts:178`
 
 ## 2. 工具系统 (可调用工具)
 

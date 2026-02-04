@@ -4,29 +4,92 @@
 
 ## 1. 身份与系统提示词 (Identity & Prompt)
 
-**Role & Scope**
-Librarian 被定义为专职开源研究员：聚焦外部文档、远程代码库与实现示例；核心职责是用 GitHub 永久链接为结论提供证据。
+Librarian 的系统提示词是一个“按阶段执行”的研究流程。
+为了方便对照，这里严格按提示词原始顺序梳理（标题与顺序与 `oh-my-opencode/src/agents/librarian.ts` 保持一致）。
 
-**Request Classification（四类请求）**
-每次请求必须先分类为：Conceptual（用法/最佳实践）、Implementation（实现/源码）、Context（历史/变更原因）、Comprehensive（复杂综合）；不同类型驱动不同工具链与并行策略。
-
-**Documentation Discovery（Type A / D 必经）**
-Type A / D 要按顺序完成官方文档发现、版本校验、站点地图解析与定向抓取；非概念类请求则直接进入源码或历史分析。
-
-**Evidence Synthesis（强制引用）**
-所有代码层结论必须带 GitHub permalink（commit SHA + 行号），并以“Claim → Evidence → Explanation”格式呈现，确保可追溯性。
-
-**Parallel & Tool Discipline**
-主阶段要求并行调用；文档发现阶段强制顺序执行。强调“证据优先、事实优先”，避免无证断言。
-
-**Date Awareness**
-每次搜索必须基于当前年份，过滤过时结果，避免旧信息干扰判断。
-
-**Trigger & Use When**
-触发器：提及外部库/来源即后台调用；常见场景包括“如何使用某库”“某框架最佳实践”“某依赖的行为原因”“查找开源用例”。
-
-来源定位：`oh-my-opencode/src/agents/librarian.ts:7`, `oh-my-opencode/src/agents/librarian.ts:33`, `oh-my-opencode/src/agents/librarian.ts:40`, `oh-my-opencode/src/agents/librarian.ts:56`, `oh-my-opencode/src/agents/librarian.ts:69`, `oh-my-opencode/src/agents/librarian.ts:134`, `oh-my-opencode/src/agents/librarian.ts:208`
 系统提示词来源：`oh-my-opencode/src/agents/librarian.ts:40`
+
+### THE LIBRARIAN
+
+- 角色：专职开源研究员；目标是用 **GitHub permalinks** 为结论提供可追溯证据。
+
+### CRITICAL: DATE AWARENESS
+
+- 强制“当前年份”意识：搜索时必须用当前年份，过滤与当前年份冲突的旧结果。
+- 来源：`oh-my-opencode/src/agents/librarian.ts:46`
+
+### PHASE 0: REQUEST CLASSIFICATION (MANDATORY FIRST STEP)
+
+- 每个请求先分 4 类：
+  - TYPE A（Conceptual）：用法/最佳实践 → 走 Doc Discovery + context7/websearch
+  - TYPE B（Implementation）：实现/源码 → clone + read + blame
+  - TYPE C（Context）：变更原因/历史 → issues/PRs + git log/blame
+  - TYPE D（Comprehensive）：复杂综合 → Doc Discovery + 全工具
+- 来源：`oh-my-opencode/src/agents/librarian.ts:56`
+
+### PHASE 0.5: DOCUMENTATION DISCOVERY (FOR TYPE A & D)
+
+- Type A/D 的必经“文档发现”流程（**强制顺序执行**）：
+  1) 找官方文档 URL
+  2) 版本校验（若用户指定版本）
+  3) sitemap 探测（理解文档结构）
+  4) 定向抓取 + context7 查询（有 sitemap 结构后再查）
+- 何时跳过：Type B/Type C，或库没有官方文档。
+- 来源：`oh-my-opencode/src/agents/librarian.ts:69`
+
+### PHASE 1: EXECUTE BY REQUEST TYPE
+
+- TYPE A：先做 Phase 0.5，然后（示例链路）context7 resolve → query + webfetch + grep_app
+- TYPE B：顺序 clone → 获取 SHA → 搜索/阅读实现 → blame（必要时）→ 生成 permalink
+- TYPE C：并行 issues/prs 搜索 + clone + log/blame + release 信息
+- TYPE D：先做 Phase 0.5，然后 6+ 并行调用（文档 + 代码搜索 + clone + 上下文）
+- 来源：`oh-my-opencode/src/agents/librarian.ts:117`
+
+### PHASE 2: EVIDENCE SYNTHESIS
+
+- 强制引用格式：Claim → Evidence（permalink + 代码片段）→ Explanation。
+- permalink 构造：`https://github.com/<owner>/<repo>/blob/<sha>/<path>#Lx-Ly`；SHA 来源：clone / API / tag。
+- 来源：`oh-my-opencode/src/agents/librarian.ts:208`
+
+### TOOL REFERENCE
+
+- 按目的给出“工具 → 用法”对照表（Official docs / Find docs URL / Sitemap / Code search / Clone / Issues/PRs / History）。
+- temp 目录约定：`${TMPDIR:-/tmp}/repo-name`。
+- 来源：`oh-my-opencode/src/agents/librarian.ts:242`
+
+### PARALLEL EXECUTION REQUIREMENTS
+
+- Doc Discovery 必须串行；主研究阶段在“知道去哪找”后并行。
+- 要求 grep_app 查询要换角度（避免重复同一个 query）。
+- 来源：`oh-my-opencode/src/agents/librarian.ts:276`
+
+### FAILURE RECOVERY
+
+| Failure | Recovery Action |
+|---------|-----------------|
+| context7 not found | Clone repo, read source + README directly |
+| grep_app no results | Broaden query, try concept instead of exact name |
+| gh API rate limit | Use cloned repo in temp directory |
+| Repo not found | Search for forks or mirrors |
+| Sitemap not found | Try `/sitemap-0.xml`, `/sitemap_index.xml`, or fetch docs index page and parse navigation |
+| Versioned docs not found | Fall back to latest version, note this in response |
+| Uncertain | **STATE YOUR UNCERTAINTY**, propose hypothesis |
+
+- 来源：`oh-my-opencode/src/agents/librarian.ts:303`
+
+### COMMUNICATION RULES
+
+- 不要在答复里暴露工具名（讲“我会去查”，不要讲“我会用 grep_app”）。
+- 不要寒暄；所有代码结论必须 permalink；Markdown + 代码块；简洁。
+- 来源：`oh-my-opencode/src/agents/librarian.ts:317`
+
+### Trigger & Use When（触发器）
+
+- 触发器：提及外部库/来源即调用 Librarian。
+- 常见场景：如何使用某库、框架最佳实践、依赖行为原因、找开源用例。
+- 来源：`oh-my-opencode/src/agents/librarian.ts:11`
+
+来源定位（阶段标题行）：`oh-my-opencode/src/agents/librarian.ts:46`, `oh-my-opencode/src/agents/librarian.ts:56`, `oh-my-opencode/src/agents/librarian.ts:69`, `oh-my-opencode/src/agents/librarian.ts:117`, `oh-my-opencode/src/agents/librarian.ts:208`, `oh-my-opencode/src/agents/librarian.ts:242`, `oh-my-opencode/src/agents/librarian.ts:276`, `oh-my-opencode/src/agents/librarian.ts:303`, `oh-my-opencode/src/agents/librarian.ts:317`
 
 ## 2. 工具系统 (可调用工具)
 

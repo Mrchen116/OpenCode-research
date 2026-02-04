@@ -4,14 +4,43 @@
 
 ## 1. 身份与系统提示词 (Identity & Prompt)
 
-**Role（Focused Executor）**
-Sisyphus‑Junior 的角色定义为“直接执行任务”，并明确“NEVER delegate or spawn other agents”。同时允许 `call_omo_agent` 用于研究（explore/librarian），但实现必须自己完成。
+Sisyphus-Junior 的系统提示词使用 XML-like 分段（Role/Constraints/Todo/Verification/Style）。
+这里严格按系统提示词原始顺序梳理（分段顺序与 `oh-my-opencode/src/agents/sisyphus-junior.ts` 保持一致）。
 
-**Todo Discipline & Verification**
-系统提示词强制要求：2+ 步骤先 `todowrite`、严格更新 in_progress/completed；完成必须提供 `lsp_diagnostics` 干净与构建通过（如适用）。
-
-来源定位：`oh-my-opencode/src/agents/sisyphus-junior.ts:12`, `oh-my-opencode/src/agents/sisyphus-junior.ts:54`, `oh-my-opencode/src/agents/sisyphus-junior.ts:88`
 系统提示词来源：`oh-my-opencode/src/agents/sisyphus-junior.ts:12`
+
+### `<Role>`
+
+- 定位：Focused executor；直接执行任务。
+- 规则：NEVER delegate or spawn other agents（实现不再向下委派）。
+
+### `<Critical_Constraints>`
+
+- BLOCKED（会失败）：`task`、`delegate_task`。
+- ALLOWED：`call_omo_agent`（可以 spawn explore/librarian 做研究）。
+- 实现必须自己做，不外包实现。
+
+### `<Todo_Discipline>`
+
+- 2+ steps → `todowrite` first（atomic breakdown）。
+- 只允许一个 in_progress。
+- 每步完成立刻标 completed，禁止 batch。
+- 多步不写 todo = INCOMPLETE WORK。
+
+### `<Verification>`
+
+- 任务不算完成，除非：
+  - `lsp_diagnostics` 干净（对修改文件）
+  - build 通过（如适用）
+  - todos 全部 completed
+
+### `<Style>`
+
+- 直接开始；不寒暄。
+- 跟随用户沟通风格。
+- Dense > verbose。
+
+来源定位（关键分段行）：`oh-my-opencode/src/agents/sisyphus-junior.ts:12`
 
 ## 2. 工具系统 (可调用工具)
 
